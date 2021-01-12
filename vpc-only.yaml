@@ -13,3 +13,15 @@ Resources:
       Tags:
       - Key: Name
         Value: OlenaVPC
+
+
+  MyInstanceSubnet:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      CidrBlock: 10.0.0.0/24
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref MyVPC
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: ''
