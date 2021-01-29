@@ -25,3 +25,90 @@ Resources:
         Fn::Select:
         - 0
         - Fn::GetAZs: ''
+
+  MyIGW:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+        - Key: Name
+          Value: MyIGW
+
+  MyIGWAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      InternetGatewayId: !Ref MyIGW
+      VpcId: !Ref MyVPC
+
+  MyRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref MyVPC
+      Tags:
+        - Key: Name
+          Value: MyRouteTable
+
+  MyRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref MyIGW
+      RouteTableId: !Ref MyRouteTable
+
+  MySubnetRouteTableAssoc:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref MyRouteTable
+      SubnetId: !Ref MyInstanceSubnet
+
+
+  MyInstanceSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Allow SSH and HTTP
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '8080'
+          ToPort: '8080'
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: MyInstanceSecurityGroup
+
+  MyInstance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      Tags:
+        - Key: Name
+          Value: 'Test Instance'
+#      IamInstanceProfile: !Ref MqInstanceProfile
+      ImageId: "ami-047a51fa27710816e"
+      InstanceType: "t2.micro"
+      KeyName: "olena-kp1"
+      SecurityGroupIds:
+        - !Ref MyInstanceSecurityGroup
+      SubnetId: !Ref MyInstanceSubnet
+      UserData:
+        Fn::Base64: !Sub |
+          #! /bin/bash
+          echo '==========> cloud-init user data script started'
+          export AWS_DEFAULT_REGION=${AWS::Region}
+          export AWS_REGION=$AWS_DEFAULT_REGION
+          export STACK_ID=${AWS::StackId}
+          yum install -y git jq
+          mkdir -p /var/lambda-test
+          cd /var/lambda-test
+          git clone https://github.com/yurist/mqlambdatm-demo.git
+          cd mqlambdatm-demo/demo/cloud-init
+          ./run-demo.sh
+    DependsOn:
+      - MyIGW
